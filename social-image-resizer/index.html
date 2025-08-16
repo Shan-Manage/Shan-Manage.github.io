@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Social Media Image Resizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .drop-zone {
+            border: 2px dashed #4A5568; /* gray-700 */
+            transition: all 0.3s ease;
+        }
+        .drop-zone.dragover {
+            border-color: #FBBF24; /* amber-400 */
+            background-color: #374151; /* gray-700 */
+        }
+        .preset-btn {
+            transition: all 0.2s ease-in-out;
+        }
+        .preset-btn.active {
+            background-color: #FBBF24; /* amber-400 */
+            color: #1F2937; /* gray-800 */
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-6xl mx-auto">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl md:text-5xl font-bold">Social Media Image Resizer</h1>
+            <p class="text-gray-400 mt-2">Quickly resize images for any platform.</p>
+        </header>
+
+        <main class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+            <!-- UPLOAD & CONTROLS PANEL -->
+            <div class="lg:col-span-1 bg-gray-800 rounded-2xl p-6 shadow-lg">
+                <h2 class="text-2xl font-bold mb-6 text-amber-400">Controls</h2>
+
+                <!-- Uploader -->
+                <div id="drop-zone" class="drop-zone w-full p-6 text-center rounded-lg cursor-pointer hover:bg-gray-700/50">
+                    <p class="text-gray-400">Drag & drop an image here</p>
+                    <p class="text-gray-500 my-2">or</p>
+                    <button id="upload-btn" class="bg-amber-500 hover:bg-amber-600 text-gray-900 font-bold py-2 px-4 rounded-lg transition-all duration-300">
+                        Click to Upload
+                    </button>
+                    <input type="file" id="file-input" class="hidden" accept="image/*">
+                </div>
+                
+                <!-- Presets -->
+                <div class="mt-6">
+                    <h3 class="font-semibold mb-3 text-gray-300">Presets</h3>
+                    <div id="presets-container" class="grid grid-cols-2 gap-2">
+                        <!-- Presets will be dynamically added here -->
+                    </div>
+                </div>
+
+                <!-- Custom Dimensions -->
+                <div class="mt-6">
+                    <h3 class="font-semibold mb-3 text-gray-300">Custom Size</h3>
+                    <div class="flex items-center gap-4">
+                        <input type="number" id="width-input" placeholder="Width" class="w-full bg-gray-700 p-2 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                        <span class="text-gray-500">x</span>
+                        <input type="number" id="height-input" placeholder="Height" class="w-full bg-gray-700 p-2 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                    </div>
+                </div>
+            </div>
+
+            <!-- PREVIEW & DOWNLOAD PANEL -->
+            <div class="lg:col-span-2 bg-gray-800 rounded-2xl shadow-lg flex flex-col items-center justify-center p-6 min-h-[400px]">
+                <canvas id="canvas" class="max-w-full max-h-full rounded-md shadow-md"></canvas>
+                <div id="placeholder" class="text-center text-gray-500">
+                    <p>Your resized image will appear here</p>
+                </div>
+                <button id="download-btn" class="hidden mt-6 bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg transition-all duration-300 shadow-lg">
+                    Download Image
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // DOM Elements
+        const dropZone = document.getElementById('drop-zone');
+        const uploadBtn = document.getElementById('upload-btn');
+        const fileInput = document.getElementById('file-input');
+        const presetsContainer = document.getElementById('presets-container');
+        const widthInput = document.getElementById('width-input');
+        const heightInput = document.getElementById('height-input');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const placeholder = document.getElementById('placeholder');
+        const downloadBtn = document.getElementById('download-btn');
+
+        let originalImage = null;
+
+        // --- Social Media Presets ---
+        const presets = {
+            'Instagram Post': { w: 1080, h: 1080 },
+            'Instagram Story': { w: 1080, h: 1920 },
+            'Facebook Post': { w: 1200, h: 630 },
+            'Facebook Cover': { w: 851, h: 315 },
+            'Twitter Post': { w: 1600, h: 900 },
+            'Twitter Header': { w: 1500, h: 500 },
+        };
+
+        // --- Functions ---
+
+        /**
+         * Populates the presets container with buttons.
+         */
+        function populatePresets() {
+            for (const name in presets) {
+                const button = document.createElement('button');
+                button.textContent = name;
+                button.className = 'preset-btn bg-gray-700 hover:bg-gray-600 text-white text-sm py-2 px-2 rounded-md';
+                button.onclick = () => {
+                    widthInput.value = presets[name].w;
+                    heightInput.value = presets[name].h;
+                    updateActivePreset(button);
+                    resizeImage();
+                };
+                presetsContainer.appendChild(button);
+            }
+        }
+        
+        /**
+         * Handles the image file, reads it, and initiates drawing.
+         * @param {File} file - The image file to process.
+         */
+        function handleFile(file) {
+            if (!file || !file.type.startsWith('image/')) {
+                alert('Please upload a valid image file.');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                originalImage = new Image();
+                originalImage.onload = () => {
+                    // Set initial dimensions to the image's own dimensions
+                    widthInput.value = originalImage.width;
+                    heightInput.value = originalImage.height;
+                    resizeImage();
+                    downloadBtn.classList.remove('hidden');
+                    placeholder.classList.add('hidden');
+                };
+                originalImage.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        /**
+         * Resizes the image and draws it on the canvas based on input values.
+         */
+        function resizeImage() {
+            if (!originalImage) return;
+
+            const targetWidth = parseInt(widthInput.value, 10);
+            const targetHeight = parseInt(heightInput.value, 10);
+
+            if (isNaN(targetWidth) || isNaN(targetHeight) || targetWidth <= 0 || targetHeight <= 0) {
+                return; // Don't draw if dimensions are invalid
+            }
+
+            canvas.width = targetWidth;
+            canvas.height = targetHeight;
+
+            const imgAspectRatio = originalImage.width / originalImage.height;
+            const canvasAspectRatio = targetWidth / targetHeight;
+
+            let drawWidth, drawHeight, x, y;
+
+            // This logic centers the image within the canvas while maintaining aspect ratio
+            if (imgAspectRatio > canvasAspectRatio) {
+                drawWidth = targetWidth;
+                drawHeight = targetWidth / imgAspectRatio;
+            } else {
+                drawHeight = targetHeight;
+                drawWidth = targetHeight * imgAspectRatio;
+            }
+
+            x = (targetWidth - drawWidth) / 2;
+            y = (targetHeight - drawHeight) / 2;
+            
+            // Clear canvas and draw the resized image
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(originalImage, x, y, drawWidth, drawHeight);
+        }
+        
+        /**
+         * Updates the active state for preset buttons.
+         * @param {HTMLElement} clickedButton - The preset button that was clicked.
+         */
+        function updateActivePreset(clickedButton = null) {
+            document.querySelectorAll('.preset-btn').forEach(btn => btn.classList.remove('active'));
+            if (clickedButton) {
+                clickedButton.classList.add('active');
+            }
+        }
+
+        // --- Event Listeners ---
+
+        // Manual upload button
+        uploadBtn.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+
+        // Drag and drop listeners
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            handleFile(e.dataTransfer.files[0]);
+        });
+
+        // Listen for changes in custom dimension inputs
+        widthInput.addEventListener('input', () => {
+            updateActivePreset();
+            resizeImage();
+        });
+        heightInput.addEventListener('input', () => {
+            updateActivePreset();
+            resizeImage();
+        });
+
+        // Download button functionality
+        downloadBtn.addEventListener('click', () => {
+            const link = document.createElement('a');
+            link.download = `resized-image-${canvas.width}x${canvas.height}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        });
+
+        // --- Initial Setup ---
+        populatePresets();
+
+    </script>
+</body>
+</html>

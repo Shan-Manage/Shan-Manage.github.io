@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Elegant Font Pairing Suggester</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* A dedicated link tag for dynamically loading Google Fonts */
+        #google-fonts-link {
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-4xl mx-auto">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl md:text-5xl font-bold">Elegant Font Pairing Suggester</h1>
+            <p class="text-gray-400 mt-2">Discover beautiful font combinations for your projects.</p>
+        </header>
+
+        <main class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- PREVIEW PANEL -->
+            <div class="lg:col-span-2 bg-gray-800 rounded-2xl p-8 shadow-lg">
+                <div id="preview-heading" class="text-5xl font-bold mb-4">This is a Heading</div>
+                <div id="preview-body" class="text-lg text-gray-300 leading-relaxed">
+                    And this is some body text to see how the fonts pair together. The quick brown fox jumps over the lazy dog. Good design is about making other designers feel like idiots because that idea wasn’t theirs.
+                </div>
+            </div>
+
+            <!-- CONTROLS & INFO PANEL -->
+            <div class="lg:col-span-1 bg-gray-800 rounded-2xl p-6 shadow-lg flex flex-col">
+                <h2 class="text-2xl font-bold mb-6 text-amber-400">Controls</h2>
+                <button id="generate-btn" class="w-full bg-amber-500 hover:bg-amber-600 text-gray-900 font-bold py-3 px-4 rounded-lg transition-all duration-300 shadow-md mb-6">
+                    🎨 Generate New Pair
+                </button>
+
+                <div class="flex-grow">
+                    <h3 class="font-semibold mb-2 text-gray-300">Heading Font:</h3>
+                    <p id="heading-font-name" class="bg-gray-700 p-2 rounded-md font-mono text-amber-400 mb-4">Playfair Display</p>
+                    
+                    <h3 class="font-semibold mb-2 text-gray-300">Body Font:</h3>
+                    <p id="body-font-name" class="bg-gray-700 p-2 rounded-md font-mono text-amber-400 mb-6">Lato</p>
+
+                    <h3 class="font-semibold mb-2 text-gray-300">HTML Code:</h3>
+                    <div class="relative">
+                        <textarea id="html-code" readonly class="w-full h-24 bg-gray-900 text-gray-300 p-3 rounded-md resize-none font-mono text-xs border-2 border-gray-700 focus:outline-none focus:ring-2 focus:ring-amber-500"></textarea>
+                        <button id="copy-btn" class="absolute top-2 right-2 bg-gray-700 hover:bg-amber-500 text-white hover:text-gray-900 font-bold py-1 px-2 rounded-md text-xs transition-all duration-300">
+                            Copy
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- This link tag will be updated by JavaScript to load the selected fonts -->
+    <link id="google-fonts-link" rel="stylesheet" href="">
+
+    <script>
+        // DOM Elements
+        const previewHeading = document.getElementById('preview-heading');
+        const previewBody = document.getElementById('preview-body');
+        const generateBtn = document.getElementById('generate-btn');
+        const headingFontName = document.getElementById('heading-font-name');
+        const bodyFontName = document.getElementById('body-font-name');
+        const htmlCodeTextarea = document.getElementById('html-code');
+        const copyBtn = document.getElementById('copy-btn');
+        const googleFontsLink = document.getElementById('google-fonts-link');
+
+        // --- Font Pairing Data ---
+        const fontPairs = [
+            { heading: 'Playfair Display', body: 'Lato', url: 'https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Lato&display=swap' },
+            { heading: 'Merriweather', body: 'Open Sans', url: 'https://fonts.googleapis.com/css2?family=Merriweather:wght@700&family=Open+Sans&display=swap' },
+            { heading: 'Lora', body: 'Montserrat', url: 'https://fonts.googleapis.com/css2?family=Lora:wght@700&family=Montserrat&display=swap' },
+            { heading: 'Oswald', body: 'Roboto', url: 'https://fonts.googleapis.com/css2?family=Oswald:wght@700&family=Roboto&display=swap' },
+            { heading: 'Raleway', body: 'Merriweather Sans', url: 'https://fonts.googleapis.com/css2?family=Raleway:wght@700&family=Merriweather+Sans&display=swap' },
+            { heading: 'Poppins', body: 'PT Sans', url: 'https://fonts.googleapis.com/css2?family=Poppins:wght@700&family=PT+Sans&display=swap' },
+            { heading: 'Cormorant Garamond', body: 'Proza Libre', url: 'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@700&family=Proza+Libre&display=swap' },
+            { heading: 'Libre Baskerville', body: 'Source Sans Pro', url: 'https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@700&family=Source+Sans+Pro&display=swap' },
+        ];
+
+        let currentPairIndex = 0;
+
+        /**
+         * Applies a font pair to the preview and updates the info panel.
+         * @param {object} pair - The font pair object.
+         */
+        function applyFontPair(pair) {
+            // Update the href of the link tag to load the new fonts
+            googleFontsLink.href = pair.url;
+
+            // Apply the font families to the preview elements
+            previewHeading.style.fontFamily = `'${pair.heading}', serif`;
+            previewBody.style.fontFamily = `'${pair.body}', sans-serif`;
+
+            // Update the info panel
+            headingFontName.textContent = pair.heading;
+            bodyFontName.textContent = pair.body;
+            htmlCodeTextarea.value = `<link rel="stylesheet" href="${pair.url}">`;
+        }
+
+        /**
+         * Selects and applies a new, random font pair.
+         */
+        function generateNewPair() {
+            let newIndex;
+            // Ensure we don't show the same pair twice in a row
+            do {
+                newIndex = Math.floor(Math.random() * fontPairs.length);
+            } while (newIndex === currentPairIndex);
+            
+            currentPairIndex = newIndex;
+            applyFontPair(fontPairs[currentPairIndex]);
+        }
+
+        // --- Event Listeners ---
+
+        // Generate button
+        generateBtn.addEventListener('click', generateNewPair);
+
+        // Copy button
+        copyBtn.addEventListener('click', () => {
+            htmlCodeTextarea.select();
+            document.execCommand('copy');
+            
+            copyBtn.textContent = 'Copied!';
+            setTimeout(() => {
+                copyBtn.textContent = 'Copy';
+            }, 1500);
+        });
+
+        // --- Initial Setup ---
+        // Apply the first font pair when the page loads
+        window.onload = () => {
+            applyFontPair(fontPairs[0]);
+        };
+
+    </script>
+</body>
+</html>

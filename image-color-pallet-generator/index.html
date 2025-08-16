@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Powered Color Palette Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .drop-zone {
+            border: 2px dashed #4A5568; /* gray-700 */
+            transition: all 0.3s ease;
+        }
+        .drop-zone.dragover {
+            border-color: #FBBF24; /* amber-400 */
+            background-color: #374151; /* gray-700 */
+        }
+        .color-swatch {
+            transition: transform 0.2s ease-in-out;
+        }
+        .color-swatch:hover {
+            transform: scale(1.05);
+        }
+        /* Loading Spinner */
+        .loader {
+            border: 5px solid #4A5568; /* gray-700 */
+            border-top: 5px solid #FBBF24; /* amber-400 */
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-5xl mx-auto">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl md:text-5xl font-bold">AI-Powered Color Palette Generator</h1>
+            <p class="text-gray-400 mt-2">Upload an image to extract its color palette with AI.</p>
+        </header>
+
+        <main class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+            <!-- UPLOAD & PREVIEW PANEL -->
+            <div class="lg:col-span-1 bg-gray-800 rounded-2xl p-6 shadow-lg flex flex-col items-center">
+                <h2 class="text-2xl font-bold mb-6 text-amber-400 w-full">1. Upload Image</h2>
+                <div id="drop-zone" class="drop-zone w-full p-6 text-center rounded-lg cursor-pointer hover:bg-gray-700/50">
+                    <p class="text-gray-400">Drag & drop an image here</p>
+                    <p class="text-gray-500 my-2">or</p>
+                    <button id="upload-btn" class="bg-amber-500 hover:bg-amber-600 text-gray-900 font-bold py-2 px-4 rounded-lg transition-all duration-300">
+                        Click to Upload
+                    </button>
+                    <input type="file" id="file-input" class="hidden" accept="image/*">
+                </div>
+                <div id="image-preview-container" class="mt-6 w-full hidden">
+                    <img id="image-preview" src="#" alt="Uploaded Image Preview" class="max-w-full max-h-80 rounded-lg shadow-md mx-auto">
+                </div>
+            </div>
+
+            <!-- PALETTE DISPLAY PANEL -->
+            <div class="lg:col-span-1 bg-gray-800 rounded-2xl shadow-lg flex flex-col p-6">
+                <h2 class="text-2xl font-bold mb-6 text-amber-400">2. Extracted Palette</h2>
+                <div id="palette-container" class="flex-grow grid grid-cols-1 content-start gap-4">
+                    <div id="placeholder" class="text-center text-gray-500 flex flex-col items-center justify-center h-full">
+                        <p>Your beautiful color palette will appear here.</p>
+                    </div>
+                    <div id="loader" class="hidden items-center justify-center h-full">
+                        <div class="loader"></div>
+                        <p class="ml-4 text-gray-400">AI is analyzing your image...</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // DOM Elements
+        const dropZone = document.getElementById('drop-zone');
+        const uploadBtn = document.getElementById('upload-btn');
+        const fileInput = document.getElementById('file-input');
+        const imagePreviewContainer = document.getElementById('image-preview-container');
+        const imagePreview = document.getElementById('image-preview');
+        const paletteContainer = document.getElementById('palette-container');
+        const placeholder = document.getElementById('placeholder');
+        const loader = document.getElementById('loader');
+
+        const apiKey = ""; // API key will be provided by the environment
+
+        /**
+         * Handles the image file, displays preview, and starts palette generation.
+         * @param {File} file - The image file to process.
+         */
+        function handleFile(file) {
+            if (!file || !file.type.startsWith('image/')) {
+                alert('Please upload a valid image file.');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                imagePreview.src = e.target.result;
+                imagePreviewContainer.classList.remove('hidden');
+                
+                // Convert to Base64 for the API
+                const base64ImageData = e.target.result.split(',')[1];
+                getPaletteFromAI(base64ImageData);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        /**
+         * Calls the Gemini API to extract colors from the image.
+         * @param {string} base64ImageData - The Base64 encoded image data.
+         */
+        async function getPaletteFromAI(base64ImageData) {
+            placeholder.classList.add('hidden');
+            loader.classList.remove('hidden');
+            paletteContainer.innerHTML = ''; // Clear previous results
+            paletteContainer.appendChild(loader);
+
+            const prompt = "Analyze this image and extract the 6 most dominant and harmonious colors. The palette should be aesthetically pleasing. Return them as a JSON object containing an array of hex code strings.";
+            
+            const payload = {
+                contents: [{
+                    parts: [
+                        { text: prompt },
+                        { inlineData: { mimeType: "image/jpeg", data: base64ImageData } }
+                    ]
+                }],
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            "palette": {
+                                type: "ARRAY",
+                                items: { type: "STRING" }
+                            }
+                        }
+                    }
+                }
+            };
+            
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+            try {
+                const result = await fetchWithBackoff(apiUrl, payload);
+                const jsonText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (jsonText) {
+                    const parsedJson = JSON.parse(jsonText);
+                    displayPalette(parsedJson.palette);
+                } else {
+                    throw new Error("AI did not return a valid palette.");
+                }
+            } catch (error) {
+                console.error("Error fetching palette:", error);
+                displayError("Sorry, the AI couldn't generate a palette. Please try another image.");
+            }
+        }
+        
+        /**
+         * Function to call Gemini API with exponential backoff
+         */
+        async function fetchWithBackoff(apiUrl, payload, maxRetries = 5) {
+            let delay = 1000;
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    if (response.ok) return await response.json();
+                } catch (error) { console.error("Fetch error:", error); }
+                await new Promise(resolve => setTimeout(resolve, delay));
+                delay *= 2;
+            }
+            throw new Error("Failed to fetch from API after multiple retries.");
+        }
+
+        /**
+         * Displays the extracted color palette in the UI.
+         * @param {string[]} colors - An array of hex color strings.
+         */
+        function displayPalette(colors) {
+            loader.classList.add('hidden');
+            paletteContainer.innerHTML = ''; // Clear loader
+            colors.forEach(color => {
+                const swatch = document.createElement('div');
+                swatch.className = 'color-swatch flex items-center justify-between bg-gray-700 p-4 rounded-lg shadow-md';
+                
+                const colorPreview = document.createElement('div');
+                colorPreview.className = 'w-10 h-10 rounded-full border-2 border-gray-500';
+                colorPreview.style.backgroundColor = color;
+                
+                const colorCode = document.createElement('span');
+                colorCode.className = 'font-mono text-lg text-gray-300';
+                colorCode.textContent = color;
+                
+                const copyButton = document.createElement('button');
+                copyButton.className = 'bg-gray-600 hover:bg-amber-500 text-white hover:text-gray-900 font-bold py-1 px-3 rounded-md text-sm transition-all duration-300';
+                copyButton.textContent = 'Copy';
+                copyButton.onclick = () => {
+                    navigator.clipboard.writeText(color);
+                    copyButton.textContent = 'Copied!';
+                    setTimeout(() => { copyButton.textContent = 'Copy'; }, 1500);
+                };
+                
+                swatch.appendChild(colorPreview);
+                swatch.appendChild(colorCode);
+                swatch.appendChild(copyButton);
+                paletteContainer.appendChild(swatch);
+            });
+        }
+        
+        /**
+         * Displays an error message in the palette container.
+         * @param {string} message - The error message to display.
+         */
+        function displayError(message) {
+            loader.classList.add('hidden');
+            paletteContainer.innerHTML = `<div class="text-center text-red-400">${message}</div>`;
+        }
+
+        // --- Event Listeners ---
+        uploadBtn.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            handleFile(e.dataTransfer.files[0]);
+        });
+    </script>
+</body>
+</html>

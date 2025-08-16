@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Gradient Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom styles for the color input to make it look better */
+        input[type="color"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 50px;
+            height: 50px;
+            padding: 0;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        input[type="color"]::-webkit-color-swatch-wrapper {
+            padding: 0;
+            border-radius: 50%;
+        }
+        input[type="color"]::-webkit-color-swatch {
+            border: 2px solid #4A5568; /* gray-700 */
+            border-radius: 50%;
+        }
+        /* Style for the range slider */
+        input[type=range] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 8px;
+            background: #4A5568; /* gray-700 */
+            border-radius: 5px;
+            outline: none;
+            opacity: 0.7;
+            transition: opacity .2s;
+        }
+        input[type=range]:hover {
+            opacity: 1;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #FBBF24; /* amber-400 */
+            cursor: pointer;
+            border-radius: 50%;
+        }
+        input[type=range]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #FBBF24; /* amber-400 */
+            cursor: pointer;
+            border-radius: 50%;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white flex items-center justify-center min-h-screen p-4">
+
+    <div class="w-full max-w-4xl mx-auto">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl md:text-5xl font-bold">Simple Gradient Generator</h1>
+            <p class="text-gray-400 mt-2">Create beautiful gradients and get the CSS code instantly.</p>
+        </header>
+
+        <main class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            
+            <!-- CONTROLS PANEL -->
+            <div class="bg-gray-800 rounded-2xl p-6 shadow-lg">
+                <h2 class="text-2xl font-bold mb-6 text-amber-400">Controls</h2>
+                
+                <!-- Color Pickers -->
+                <div class="mb-6">
+                    <h3 class="font-semibold mb-3 text-gray-300">Colors</h3>
+                    <div class="flex items-center justify-around bg-gray-900/50 p-4 rounded-lg">
+                        <div class="text-center">
+                            <input type="color" id="color1" value="#ff8c00">
+                            <p id="color1-text" class="mt-2 text-sm text-gray-400">#ff8c00</p>
+                        </div>
+                        <div class="text-center">
+                            <input type="color" id="color2" value="#da00ff">
+                            <p id="color2-text" class="mt-2 text-sm text-gray-400">#da00ff</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Direction Control -->
+                <div class="mb-6">
+                    <h3 class="font-semibold mb-3 text-gray-300">Direction</h3>
+                    <div class="flex items-center justify-between bg-gray-900/50 p-4 rounded-lg">
+                       <input type="range" id="direction" min="0" max="360" value="90" class="w-full">
+                       <span id="direction-text" class="ml-4 font-mono bg-gray-700 px-2 py-1 rounded">90°</span>
+                    </div>
+                </div>
+
+                <!-- Randomizer Button -->
+                <div>
+                     <button id="random-btn" class="w-full bg-amber-500 hover:bg-amber-600 text-gray-900 font-bold py-3 px-4 rounded-lg transition-all duration-300 shadow-md">
+                        🎲 Randomize
+                    </button>
+                </div>
+            </div>
+
+            <!-- PREVIEW & CODE PANEL -->
+            <div class="bg-gray-800 rounded-2xl shadow-lg flex flex-col">
+                <!-- Live Preview -->
+                <div id="preview" class="w-full h-64 rounded-t-2xl transition-all duration-300"></div>
+                
+                <!-- Code Output -->
+                <div class="p-6 flex-grow flex flex-col">
+                    <h3 class="text-lg font-semibold mb-3 text-gray-300">CSS Code</h3>
+                    <div class="relative flex-grow">
+                        <textarea id="css-code" readonly class="w-full h-full bg-gray-900 text-gray-300 p-4 rounded-lg resize-none font-mono text-sm border-2 border-gray-700 focus:outline-none focus:ring-2 focus:ring-amber-500"></textarea>
+                        <button id="copy-btn" class="absolute top-3 right-3 bg-gray-700 hover:bg-amber-500 text-white hover:text-gray-900 font-bold py-1 px-3 rounded-md text-sm transition-all duration-300">
+                            Copy
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // DOM Elements
+        const color1Input = document.getElementById('color1');
+        const color2Input = document.getElementById('color2');
+        const color1Text = document.getElementById('color1-text');
+        const color2Text = document.getElementById('color2-text');
+        const directionInput = document.getElementById('direction');
+        const directionText = document.getElementById('direction-text');
+        const previewBox = document.getElementById('preview');
+        const cssCodeTextarea = document.getElementById('css-code');
+        const copyBtn = document.getElementById('copy-btn');
+        const randomBtn = document.getElementById('random-btn');
+
+        // Initial state
+        let color1 = color1Input.value;
+        let color2 = color2Input.value;
+        let direction = directionInput.value;
+
+        /**
+         * Updates the gradient preview and the CSS code output.
+         */
+        function updateGradient() {
+            // Generate the CSS linear-gradient string
+            const gradientString = `linear-gradient(${direction}deg, ${color1}, ${color2})`;
+            
+            // Apply the gradient to the preview box
+            previewBox.style.background = gradientString;
+            
+            // Update the CSS code in the textarea
+            // We provide both the standard background and the fallback background-image property
+            cssCodeTextarea.value = `background: ${color1};\nbackground: ${gradientString};`;
+            
+            // Update the text labels for colors and direction
+            color1Text.textContent = color1;
+            color2Text.textContent = color2;
+            directionText.textContent = `${direction}°`;
+        }
+
+        // --- Event Listeners ---
+
+        // Listen for changes on the first color picker
+        color1Input.addEventListener('input', (e) => {
+            color1 = e.target.value;
+            updateGradient();
+        });
+
+        // Listen for changes on the second color picker
+        color2Input.addEventListener('input', (e) => {
+            color2 = e.target.value;
+            updateGradient();
+        });
+
+        // Listen for changes on the direction slider
+        directionInput.addEventListener('input', (e) => {
+            direction = e.target.value;
+            updateGradient();
+        });
+
+        // Copy button functionality
+        copyBtn.addEventListener('click', () => {
+            cssCodeTextarea.select();
+            // The document.execCommand is used for broader compatibility in sandboxed environments
+            document.execCommand('copy');
+            
+            // Provide user feedback
+            copyBtn.textContent = 'Copied!';
+            setTimeout(() => {
+                copyBtn.textContent = 'Copy';
+            }, 1500);
+        });
+
+        /**
+         * Generates a random hex color.
+         * @returns {string} A random color in hex format (e.g., "#1a2b3c").
+         */
+        function getRandomColor() {
+            const letters = '0123456789abcdef';
+            let color = '#';
+            for (let i = 0; i < 6; i++) {
+                color += letters[Math.floor(Math.random() * 16)];
+            }
+            return color;
+        }
+
+        // Randomize button functionality
+        randomBtn.addEventListener('click', () => {
+            color1 = getRandomColor();
+            color2 = getRandomColor();
+            direction = Math.floor(Math.random() * 361); // Random angle from 0 to 360
+
+            // Update the input values to reflect the random choice
+            color1Input.value = color1;
+            color2Input.value = color2;
+            directionInput.value = direction;
+            
+            // Update the gradient with the new random values
+            updateGradient();
+        });
+
+        // Initial call to set the gradient when the page loads
+        window.onload = updateGradient;
+
+    </script>
+</body>
+</html>
